@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import feedparser
-import google.generativeai as genai
+from google import genai
 
 # 1. 各種設定
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -10,11 +10,7 @@ LINE_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_USER_ID = os.getenv("LINE_USER_ID")
 
 # APIの初期化
-genai.configure(api_key=GEMINI_API_KEY)
-
-# 【修正ポイント】モデル名をプレフィックスなしの文字列で指定
-# もしこれでもエラーが出る場合は 'gemini-1.5-flash-latest' を試してください
-model = genai.GenerativeModel('gemini-1.5-flash')
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # 2. ニュース収集
 RSS_URLS = [
@@ -33,22 +29,25 @@ def fetch_news():
     return list(set(matched))
 
 def summarize_news(news_list):
-    if not news_list: return None
-    
+    if not news_list:
+        return None
+
     text = "\n".join(news_list)
-    # プロンプトをより明確に
     prompt = f"以下のニュースリストから重要なトピックを選び、150文字程度で要約して。箇条書きを使って:\n{text}"
-    
-    # AIによる生成（エラーハンドリング付き）
+
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.5-pro",  # ✅ 最新安定版に更新
+            contents=prompt
+        )
         return response.text
     except Exception as e:
         print(f"Gemini生成エラー: {e}")
         return None
 
 def send_line(message):
-    if not message: return
+    if not message:
+        return
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
         "Content-Type": "application/json",
@@ -65,9 +64,9 @@ if __name__ == "__main__":
     print("ニュース確認中...")
     articles = fetch_news()
     print(f"{len(articles)}件の記事が見つかりました。AIで要約を開始します。")
-    
+
     summary = summarize_news(articles)
-    
+
     if summary:
         send_line(summary)
         print("LINEに送信完了しました！")
