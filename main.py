@@ -1,50 +1,55 @@
+import os
 import feedparser
+import google.generativeai as genai
 
-# 1. 巡回ルート（RSSフィード）の設定
+# 1. Geminiの設定（GitHub Secretsから鍵を読み込む）
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+# 2. 巡回ルート
 RSS_URLS = [
-    "https://news.yahoo.co.jp/rss/topics/top-picks.xml",    # Yahoo主要
-    "https://news.yahoo.co.jp/rss/categories/business.xml",  # Yahoo経済
-    "https://news.yahoo.co.jp/rss/categories/world.xml",     # Yahoo国際
-    "https://prtimes.jp/main/php/index.php?obj=rss&method=index", # PR TIMES
-    "https://jp.reuters.com/rss/topNews"                    # ロイター
+    "https://news.yahoo.co.jp/rss/topics/top-picks.xml",
+    "https://news.yahoo.co.jp/rss/categories/business.xml",
+    "https://news.yahoo.co.jp/rss/categories/world.xml",
+    "https://prtimes.jp/main/php/index.php?obj=rss&method=index"
 ]
 
-# 2. キーワード
-KEYWORDS = [
-    "発表", "提携", "買収", "出資", "開業", "参入", "撤退", "決算", "実証実験", "キャンペーン",
-    "制裁", "関税", "輸出規制", "停戦", "軍事", "軍事衝突", "首脳会談", "通商協議", "中央銀行", "利下げ", "原油"
-]
+# 3. キーワード
+KEYWORDS = ["発表", "提携", "買収", "出資", "開業", "参入", "決算", "実証実験", "制裁", "関税", "輸出規制", "利下げ"]
 
-def fetch_and_filter():
-    print("--- ニュースの取得を開始します ---")
-    matched_articles = []
-
+def fetch_news():
+    matched = []
     for url in RSS_URLS:
         feed = feedparser.parse(url)
         for entry in feed.entries:
-            # タイトルまたは本文にキーワードが含まれているかチェック
-            title = entry.title
-            summary = entry.get('summary', '')
-            link = entry.link
-            
-            # キーワードマッチング
-            found_kws = [kw for kw in KEYWORDS if kw in title or kw in summary]
-            
+            found_kws = [kw for kw in KEYWORDS if kw in entry.title]
             if found_kws:
-                matched_articles.append({
-                    "title": title,
-                    "link": link,
-                    "keywords": list(set(found_kws))
-                })
+                matched.append({"title": entry.title, "link": entry.link})
+    return {v['link']: v for v in matched}.values()
 
-    # 重複の削除（URLで判定）
-    unique_articles = {v['link']: v for v in matched_articles}.values()
+def summarize_news(articles):
+    if not articles:
+        return "本日の該当ニュースはありませんでした。"
     
-    return list(unique_articles)
+    text_to_summarize = "\n".join([f"タイトル: {a['title']}" for a in articles])
+    
+    prompt = f"""
+    以下のニュースタイトルリストを読み取り、ビジネスに関心がある人向けに
+    「日経新聞の要約」のようなトーンで、重要なものを5件程度ピックアップして
+    それぞれ1行〜2行で要約してください。
+    
+    {text_to_summarize}
+    """
+    
+    response = model.generate_content(prompt)
+    return response.text
 
-# 実行テスト
 if __name__ == "__main__":
-    articles = fetch_and_filter()
-    for i, art in enumerate(articles, 1):
-        print(f"{i}. [{art['keywords']}] {art['title']}")
-        print(f"   URL: {art['link']}\n")
+    print("--- ニュース収集開始 ---")
+    news_list = fetch_news()
+    print(f"{len(news_list)}件の記事を抽出しました。AIで要約中...")
+    
+    summary = summarize_news(news_list)
+    print("\n=== AI要約結果 ===\n")
+    print(summary)
