@@ -23,6 +23,10 @@ def fetch_news():
     matched = []
     for url in RSS_URLS:
         feed = feedparser.parse(url)
+        print(f"URL: {url}")
+        print(f"  取得件数: {len(feed.entries)}件")
+        for entry in feed.entries[:3]:
+            print(f"  タイトル例: {entry.title}")
         for entry in feed.entries:
             if any(kw in entry.title for kw in KEYWORDS):
                 matched.append(entry.title)
@@ -37,7 +41,7 @@ def summarize_news(news_list):
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash",  # ✅ 最新安定版に更新
+            model="gemini-2.0-flash",
             contents=prompt
         )
         return response.text
@@ -55,7 +59,7 @@ def send_line(message):
     }
     data = {
         "to": LINE_USER_ID,
-        "messages": [{"type": "text", "text": f"【AIニュース要約】\n{message}"}]
+        "messages": [{"type": "text", "text": f"AIニュース要約\n{message}"}]
     }
     res = requests.post(url, headers=headers, data=json.dumps(data))
     print(f"LINE送信ステータス: {res.status_code}")
@@ -69,6 +73,6 @@ if __name__ == "__main__":
 
     if summary:
         send_line(summary)
-        print("LINEに送信完了しました！")
+        print("LINEに送信完了しました!")
     else:
         print("要約が生成されませんでした。")
