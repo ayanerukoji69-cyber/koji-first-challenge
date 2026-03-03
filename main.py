@@ -4,13 +4,15 @@ import requests
 import feedparser
 import google.generativeai as genai
 
-# 1. 各種設定（GitHub Secretsから読み込み）
+# 1. 各種設定
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 LINE_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_USER_ID = os.getenv("LINE_USER_ID")
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+
+# モデル名の指定を、より確実な方法に変更
+model = genai.GenerativeModel(model_name='gemini-1.5-flash')
 
 # 2. ニュース収集
 RSS_URLS = [
@@ -30,7 +32,11 @@ def fetch_news():
 
 def summarize_news(news_list):
     if not news_list: return None
-    prompt = "以下のニュースリストから重要なものを数件選び、経済の専門家として200文字程度で要約して:\n" + "\n".join(news_list)
+    # リストを文字列に変換
+    text = "\n".join(news_list)
+    prompt = f"以下のニュースをビジネスマン向けに短く要約して:\n{text}"
+    
+    # 生成実行
     response = model.generate_content(prompt)
     return response.text
 
@@ -51,10 +57,14 @@ def send_line(message):
 if __name__ == "__main__":
     print("ニュース確認中...")
     articles = fetch_news()
-    summary = summarize_news(articles)
+    print(f"{len(articles)}件の記事が見つかりました。")
     
-    if summary:
-        send_line(summary)
-        print("LINEに送信しました！")
-    else:
-        print("本日は該当するニュースがありませんでした。")
+    try:
+        summary = summarize_news(articles)
+        if summary:
+            send_line(summary)
+            print("LINEに送信しました！")
+        else:
+            print("要約対象がありませんでした。")
+    except Exception as e:
+        print(f"エラーが発生しました: {e}")
