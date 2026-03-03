@@ -37,7 +37,7 @@ def summarize_news(news_list):
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-pro",  # ✅ 最新安定版に更新
+            model="gemini-2.0-flash",  # ✅ 最新安定版に更新
             contents=prompt
         )
         return response.text
